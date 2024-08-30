@@ -1,10 +1,3 @@
-//
-//  FileOperations.swift
-//  iOS Backup Extractor
-//
-//  Created by Vratislav Holub on 29.08.2024.
-//
-
 import Foundation
 import FMDB
 
@@ -14,17 +7,13 @@ func getFileIDToNameMapping(manifestDBPath: String) -> [String: String]? {
     var fileIDToName = [String: String]()
     
     let dbURL = URL(fileURLWithPath: manifestDBPath)
-    
-    // Přímá inicializace FMDatabase, není třeba kontrolovat Optional
     let db = FMDatabase(path: dbURL.path)
     
-    // Otevření databáze a kontrola, zda se úspěšně otevřela
     guard db.open() else {
         print("Failed to open database.")
         return nil
     }
     
-    // Zajištění uzavření databáze po dokončení operací
     defer {
         db.close()
     }
@@ -85,16 +74,19 @@ func getFileType(for fileExtension: String) -> String {
     let videoExts = [".mp4", ".mov", ".avi", ".mkv"]
     let documentExts = [".pdf", ".docx", ".xlsx", ".pptx"]
     
-    if imageExts.contains(fileExtension.lowercased()) {
+    let normalizedExtension = "." + fileExtension.lowercased()  // Přidáme tečku a převod na malá písmena
+
+    if imageExts.contains(normalizedExtension) {
         return "Photos"
-    } else if videoExts.contains(fileExtension.lowercased()) {
+    } else if videoExts.contains(normalizedExtension) {
         return "Videos"
-    } else if documentExts.contains(fileExtension.lowercased()) {
+    } else if documentExts.contains(normalizedExtension) {
         return "Documents"
     } else {
         return "Others"
     }
 }
+
 
 func organizeFiles(backupRootDir: String) {
     let categories = ["Photos", "Videos", "Documents", "Others"]
@@ -109,8 +101,12 @@ func organizeFiles(backupRootDir: String) {
     if let enumerator = fileManager.enumerator(at: rootURL, includingPropertiesForKeys: nil) {
         for case let fileURL as URL in enumerator {
             if fileURL.hasDirectoryPath { continue }
-            let fileExtension = fileURL.pathExtension
+            let fileExtension = fileURL.pathExtension.lowercased()
             let fileType = getFileType(for: fileExtension)
+            
+            // Ladicí výpis pro kontrolu
+            print("Processing file: \(fileURL.lastPathComponent) with extension: \(fileExtension), categorized as: \(fileType)")
+            
             let categoryURL = rootURL.appendingPathComponent(fileType)
             let destURL = categoryURL.appendingPathComponent(fileURL.lastPathComponent)
             
@@ -125,3 +121,4 @@ func organizeFiles(backupRootDir: String) {
         }
     }
 }
+

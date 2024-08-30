@@ -15,7 +15,7 @@ struct ContentView: View {
 
     var body: some View {
         VStack {
-            Text("Backup File Organizer")
+            Text("iOS Backup Extractor (od Vratika)")
                 .font(.largeTitle)
                 .padding()
 
