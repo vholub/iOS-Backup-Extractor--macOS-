@@ -55,8 +55,11 @@ func renameFiles(backupDir: String, fileIDToName: [String: String]) {
             if fileURL.hasDirectoryPath { continue }
             let fileID = fileURL.lastPathComponent
             if let relativePath = fileIDToName[fileID] {
-                let destURL = directoryURL.appendingPathComponent(relativePath)
+                var destURL = directoryURL.appendingPathComponent(relativePath)
                 ensureDirectoryExists(at: destURL.deletingLastPathComponent().path)
+                
+                // Kontrola, zda soubor již existuje, a vytvoření jedinečného názvu souboru
+                destURL = makeUnique(destURL: destURL)
                 
                 do {
                     print("Renaming \(fileURL.path) to \(destURL.path)")
@@ -69,8 +72,27 @@ func renameFiles(backupDir: String, fileIDToName: [String: String]) {
     }
 }
 
+// Funkce pro vytvoření jedinečného názvu souboru
+func makeUnique(destURL: URL) -> URL {
+    var uniqueURL = destURL
+    let fileManager = FileManager.default
+    var counter = 1
+    
+    while fileManager.fileExists(atPath: uniqueURL.path) {
+        // Přidáme číslo ke jménu souboru před příponu, například "Cookies (1).binarycookies"
+        let fileName = uniqueURL.deletingPathExtension().lastPathComponent
+        let fileExtension = uniqueURL.pathExtension
+        let newFileName = "\(fileName) (\(counter)).\(fileExtension)"
+        uniqueURL = uniqueURL.deletingLastPathComponent().appendingPathComponent(newFileName)
+        counter += 1
+    }
+    
+    return uniqueURL
+}
+
+
 func getFileType(for fileExtension: String) -> String {
-    let imageExts = [".jpg", ".jpeg", ".png", ".gif", ".tiff"]
+    let imageExts = [".jpg", ".jpeg", ".png", ".gif", ".tiff", ".heic"]
     let videoExts = [".mp4", ".mov", ".avi", ".mkv"]
     let documentExts = [".pdf", ".docx", ".xlsx", ".pptx"]
     
