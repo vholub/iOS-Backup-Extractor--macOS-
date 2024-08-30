@@ -46,9 +46,10 @@ func ensureDirectoryExists(at path: String) {
     }
 }
 
-func renameFiles(backupDir: String, fileIDToName: [String: String]) {
+func renameFiles(backupDir: String, fileIDToName: [String: String], updateProgress: @escaping (Int) -> Void) {
     let fileManager = FileManager.default
     let directoryURL = URL(fileURLWithPath: backupDir)
+    var processedFiles = 0  // Zde sledujeme počet zpracovaných souborů
     
     if let enumerator = fileManager.enumerator(at: directoryURL, includingPropertiesForKeys: nil) {
         for case let fileURL as URL in enumerator {
@@ -68,9 +69,54 @@ func renameFiles(backupDir: String, fileIDToName: [String: String]) {
                     print("Error renaming file: \(error.localizedDescription)")
                 }
             }
+            
+            // Zvyšte počet zpracovaných souborů a aktualizujte průběh
+            processedFiles += 1
+            updateProgress(processedFiles)  // Voláme uzávěr pro aktualizaci progressu
         }
     }
 }
+
+
+func organizeFiles(backupRootDir: String, updateProgress: @escaping (Int) -> Void) {
+    let categories = ["Photos", "Videos", "Documents", "Others"]
+    let fileManager = FileManager.default
+    let rootURL = URL(fileURLWithPath: backupRootDir)
+    var processedFiles = 0  // Zde sledujeme počet zpracovaných souborů
+
+    for category in categories {
+        let categoryURL = rootURL.appendingPathComponent(category)
+        ensureDirectoryExists(at: categoryURL.path)
+    }
+    
+    if let enumerator = fileManager.enumerator(at: rootURL, includingPropertiesForKeys: nil) {
+        for case let fileURL as URL in enumerator {
+            if fileURL.hasDirectoryPath { continue }
+            let fileExtension = fileURL.pathExtension.lowercased()
+            let fileType = getFileType(for: fileExtension)
+            
+            print("Processing file: \(fileURL.lastPathComponent) with extension: \(fileExtension), categorized as: \(fileType)")
+            
+            let categoryURL = rootURL.appendingPathComponent(fileType)
+            let destURL = categoryURL.appendingPathComponent(fileURL.lastPathComponent)
+            
+            ensureDirectoryExists(at: categoryURL.path)
+            
+            do {
+                print("Moving \(fileURL.path) to \(destURL.path)")
+                try fileManager.moveItem(at: fileURL, to: destURL)
+            } catch {
+                print("Error moving file: \(error.localizedDescription)")
+            }
+
+            // Zvyšte počet zpracovaných souborů a aktualizujte průběh
+            processedFiles += 1
+            updateProgress(processedFiles)  // Voláme uzávěr pro aktualizaci progressu
+        }
+    }
+}
+
+
 
 // Funkce pro vytvoření jedinečného názvu souboru
 func makeUnique(destURL: URL) -> URL {
@@ -106,41 +152,6 @@ func getFileType(for fileExtension: String) -> String {
         return "Documents"
     } else {
         return "Others"
-    }
-}
-
-
-func organizeFiles(backupRootDir: String) {
-    let categories = ["Photos", "Videos", "Documents", "Others"]
-    let fileManager = FileManager.default
-    let rootURL = URL(fileURLWithPath: backupRootDir)
-    
-    for category in categories {
-        let categoryURL = rootURL.appendingPathComponent(category)
-        ensureDirectoryExists(at: categoryURL.path)
-    }
-    
-    if let enumerator = fileManager.enumerator(at: rootURL, includingPropertiesForKeys: nil) {
-        for case let fileURL as URL in enumerator {
-            if fileURL.hasDirectoryPath { continue }
-            let fileExtension = fileURL.pathExtension.lowercased()
-            let fileType = getFileType(for: fileExtension)
-            
-            // Ladicí výpis pro kontrolu
-            print("Processing file: \(fileURL.lastPathComponent) with extension: \(fileExtension), categorized as: \(fileType)")
-            
-            let categoryURL = rootURL.appendingPathComponent(fileType)
-            let destURL = categoryURL.appendingPathComponent(fileURL.lastPathComponent)
-            
-            ensureDirectoryExists(at: categoryURL.path)
-            
-            do {
-                print("Moving \(fileURL.path) to \(destURL.path)")
-                try fileManager.moveItem(at: fileURL, to: destURL)
-            } catch {
-                print("Error moving file: \(error.localizedDescription)")
-            }
-        }
     }
 }
 

@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var backupRootDir: String = ""
     @State private var isProcessing = false
     @State private var resultMessage: String = ""
+    @State private var progress: Double = 0.0  // Nový stav pro sledování průběhu
 
     var body: some View {
         VStack {
@@ -36,12 +37,21 @@ struct ContentView: View {
             .disabled(isProcessing || backupRootDir.isEmpty)
             .padding()
 
+            if isProcessing {
+                ProgressView(value: progress, total: 1.0)  // Progress bar
+                    .padding()
+                
+                //zobrazení procent ještě
+                Text(String(format:"%.0f %%", progress*100))
+                    .padding()
+            }
+
             if !resultMessage.isEmpty {
                 Text(resultMessage)
                     .padding()
             }
         }
-        .frame(width: 500, height: 200)
+        .frame(width: 500, height: 250)  // Upravená výška pro zahrnutí ProgressView
         .padding()
     }
 
@@ -61,33 +71,48 @@ struct ContentView: View {
         
         isProcessing = true
         resultMessage = "Processing..."
+        progress = 0.0  // Resetuje progress
 
         DispatchQueue.global(qos: .background).async {
             let manifestDBPath = (backupRootDir as NSString).appendingPathComponent("Manifest.db")
 
             if FileManager.default.fileExists(atPath: manifestDBPath) {
                 if let fileIDToName = getFileIDToNameMapping(manifestDBPath: manifestDBPath) {
-                    renameFiles(backupDir: backupRootDir, fileIDToName: fileIDToName)
-                    organizeFiles(backupRootDir: backupRootDir)
+                    let totalFiles = fileIDToName.count  // Počet souborů pro progress
+
+                    // Upravte renameFiles a organizeFiles pro podporu pokroku
+                    renameFiles(backupDir: backupRootDir, fileIDToName: fileIDToName, updateProgress: { progressValue in
+                        DispatchQueue.main.async {
+                            progress = Double(progressValue) / Double(totalFiles)  // Aktualizace progressu
+                        }
+                    })
+
+                    organizeFiles(backupRootDir: backupRootDir, updateProgress: { progressValue in
+                        DispatchQueue.main.async {
+                            progress = Double(progressValue) / Double(totalFiles)
+                        }
+                    })
                     
                     DispatchQueue.main.async {
                         resultMessage = "Processing completed successfully."
+                        isProcessing = false
                     }
                 } else {
                     DispatchQueue.main.async {
                         resultMessage = "Failed to load Manifest.db."
+                        isProcessing = false
                     }
                 }
             } else {
                 DispatchQueue.main.async {
                     resultMessage = "Manifest.db not found."
+                    isProcessing = false
                 }
             }
-
-            isProcessing = false
         }
     }
 }
+
 
 #Preview {
     ContentView()
