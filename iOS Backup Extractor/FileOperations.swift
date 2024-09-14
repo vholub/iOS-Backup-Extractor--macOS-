@@ -84,21 +84,32 @@ func organizeFiles(backupRootDir: String, updateProgress: @escaping (Int) -> Voi
     let rootURL = URL(fileURLWithPath: backupRootDir)
     var processedFiles = 0  // Zde sledujeme počet zpracovaných souborů
 
+    // Vytvoříme složky pro základní kategorie a iPhone podsložky
     for category in categories {
         let categoryURL = rootURL.appendingPathComponent(category)
         ensureDirectoryExists(at: categoryURL.path)
+
+        // Přidáme i podsložky pro iPhone fotky a videa
+        if category == "Photos" || category == "Videos" {
+            let iphoneSubfolder = category == "Photos" ? "Photos-iPhone" : "Videos-iPhone"
+            let iphoneSubfolderURL = categoryURL.appendingPathComponent(iphoneSubfolder)
+            ensureDirectoryExists(at: iphoneSubfolderURL.path)
+        }
     }
     
     if let enumerator = fileManager.enumerator(at: rootURL, includingPropertiesForKeys: nil) {
         for case let fileURL as URL in enumerator {
             if fileURL.hasDirectoryPath { continue }
             let fileExtension = fileURL.pathExtension.lowercased()
-            let fileType = getFileType(for: fileExtension)
+            let fileName = fileURL.lastPathComponent
             
-            print("Processing file: \(fileURL.lastPathComponent) with extension: \(fileExtension), categorized as: \(fileType)")
+            // Použijeme název souboru i příponu k určení cílové složky
+            let fileType = getFileType(for: fileName, fileExtension: fileExtension)
+            
+            print("Processing file: \(fileName) with extension: \(fileExtension), categorized as: \(fileType)")
             
             let categoryURL = rootURL.appendingPathComponent(fileType)
-            let destURL = categoryURL.appendingPathComponent(fileURL.lastPathComponent)
+            let destURL = categoryURL.appendingPathComponent(fileName)
             
             ensureDirectoryExists(at: categoryURL.path)
             
@@ -115,6 +126,7 @@ func organizeFiles(backupRootDir: String, updateProgress: @escaping (Int) -> Voi
         }
     }
 }
+
 
 
 
@@ -137,13 +149,21 @@ func makeUnique(destURL: URL) -> URL {
 }
 
 
-func getFileType(for fileExtension: String) -> String {
+func getFileType(for fileName: String, fileExtension: String) -> String {
     let imageExts = [".jpg", ".jpeg", ".png", ".gif", ".tiff", ".heic"]
     let videoExts = [".mp4", ".mov", ".avi", ".mkv"]
     let documentExts = [".pdf", ".docx", ".xlsx", ".pptx"]
     
     let normalizedExtension = "." + fileExtension.lowercased()  // Přidáme tečku a převod na malá písmena
 
+    if fileName.hasPrefix("IMG_") {
+        if imageExts.contains(normalizedExtension) {
+            return "Photos/Photos-iPhone"
+        } else if videoExts.contains(normalizedExtension) {
+            return "Videos/Videos-iPhone"
+        }
+    }
+    
     if imageExts.contains(normalizedExtension) {
         return "Photos"
     } else if videoExts.contains(normalizedExtension) {
@@ -154,4 +174,5 @@ func getFileType(for fileExtension: String) -> String {
         return "Others"
     }
 }
+
 
