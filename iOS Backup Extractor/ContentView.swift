@@ -78,62 +78,71 @@ struct ContentView: View {
         
         let manifestDBPath = (backupRootDir as NSString).appendingPathComponent("Manifest.db")
         
-        // Kontrola přítomnosti Manifest.db
         if !FileManager.default.fileExists(atPath: manifestDBPath) {
             showAlert()
             return
         }
 
         isProcessing = true
-        resultMessage = "Processing..."
-        progress = 0.0  // Resetuje progress
-        startTime = Date()  // Uloží startovní čas
+        resultMessage = ""
+        progress = 0.0
+        startTime = Date()
 
-        // Spustíme časovač pro aktualizaci zbývajícího času jednou za 5 vteřin
         timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
             if let startTime = startTime {
                 let elapsedTime = Date().timeIntervalSince(startTime)
-                let estimatedTotalTime = elapsedTime / progress * 1.0
-                let remainingTimeInterval = estimatedTotalTime - elapsedTime
                 
-                if remainingTimeInterval > 0 {
-                    remainingTime = formatTime(seconds: Int(remainingTimeInterval))
+                // Zkontrolujeme, jestli je progress větší než 0
+                if progress > 0 {
+                    let estimatedTotalTime = elapsedTime / progress * 1.0
+                    let remainingTimeInterval = estimatedTotalTime - elapsedTime
+                    
+                    if remainingTimeInterval > 0 {
+                        remainingTime = formatTime(seconds: Int(remainingTimeInterval))
+                    } else {
+                        remainingTime = "Less than a minute"
+                    }
                 } else {
-                    remainingTime = "Less than a minute"
+                    remainingTime = "Calculating..."  // Pokud progress je 0, zobrazí se toto
                 }
             }
         }
 
+
         DispatchQueue.global(qos: .background).async {
             if let fileIDToName = getFileIDToNameMapping(manifestDBPath: manifestDBPath) {
-                let totalFiles = fileIDToName.count  // Počet souborů pro progress
+                let totalFiles = fileIDToName.count
+                let totalSteps = totalFiles * 2  // Přejmenování + organizace
 
                 renameFiles(backupDir: backupRootDir, fileIDToName: fileIDToName, updateProgress: { progressValue in
                     DispatchQueue.main.async {
-                        progress = Double(progressValue) / Double(totalFiles)  // Aktualizace progressu
+                        let renameProgress = Double(progressValue) / Double(totalFiles)
+                        progress = renameProgress / 2  // První polovina pro přejmenování
                     }
                 })
 
                 organizeFiles(backupRootDir: backupRootDir, updateProgress: { progressValue in
                     DispatchQueue.main.async {
-                        progress = Double(progressValue) / Double(totalFiles)
+                        let organizeProgress = Double(progressValue) / Double(totalFiles)
+                        progress = 0.5 + organizeProgress / 2  // Druhá polovina pro organizaci
                     }
                 })
-                
+
                 DispatchQueue.main.async {
                     resultMessage = "Processing completed successfully."
                     isProcessing = false
-                    timer?.invalidate()  // Zastav časovač po dokončení procesu
+                    timer?.invalidate()
                 }
             } else {
                 DispatchQueue.main.async {
                     resultMessage = "Failed to load Manifest.db."
                     isProcessing = false
-                    timer?.invalidate()  // Zastav časovač při chybě
+                    timer?.invalidate()
                 }
             }
         }
     }
+
 
     // Funkce pro zobrazení alertu
     private func showAlert() {

@@ -129,12 +129,14 @@ func organizeFiles(backupRootDir: String, updateProgress: @escaping (Int) -> Voi
                 
                 ensureDirectoryExists(at: categoryURL.path)
                 
+                let uniqueDestURL = makeUnique(destURL: destURL)
                 do {
-                    print("Moving \(fileURL.path) to \(destURL.path)")
-                    try fileManager.moveItem(at: fileURL, to: destURL)
+                    print("Moving \(fileURL.path) to \(uniqueDestURL.path)")
+                    try fileManager.moveItem(at: fileURL, to: uniqueDestURL)
                 } catch {
                     print("Error moving file: \(error.localizedDescription)")
                 }
+
             }
 
             // Zvyšte počet zpracovaných souborů a aktualizujte průběh
