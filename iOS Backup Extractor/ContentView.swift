@@ -69,48 +69,57 @@ struct ContentView: View {
     private func startProcessing() {
         guard !backupRootDir.isEmpty else { return }
         
+        let manifestDBPath = (backupRootDir as NSString).appendingPathComponent("Manifest.db")
+        
+        // Kontrola přítomnosti Manifest.db
+        if !FileManager.default.fileExists(atPath: manifestDBPath) {
+            showAlert()
+            return
+        }
+
         isProcessing = true
         resultMessage = "Processing..."
         progress = 0.0  // Resetuje progress
 
         DispatchQueue.global(qos: .background).async {
-            let manifestDBPath = (backupRootDir as NSString).appendingPathComponent("Manifest.db")
+            if let fileIDToName = getFileIDToNameMapping(manifestDBPath: manifestDBPath) {
+                let totalFiles = fileIDToName.count  // Počet souborů pro progress
 
-            if FileManager.default.fileExists(atPath: manifestDBPath) {
-                if let fileIDToName = getFileIDToNameMapping(manifestDBPath: manifestDBPath) {
-                    let totalFiles = fileIDToName.count  // Počet souborů pro progress
-
-                    // Upravte renameFiles a organizeFiles pro podporu pokroku
-                    renameFiles(backupDir: backupRootDir, fileIDToName: fileIDToName, updateProgress: { progressValue in
-                        DispatchQueue.main.async {
-                            progress = Double(progressValue) / Double(totalFiles)  // Aktualizace progressu
-                        }
-                    })
-
-                    organizeFiles(backupRootDir: backupRootDir, updateProgress: { progressValue in
-                        DispatchQueue.main.async {
-                            progress = Double(progressValue) / Double(totalFiles)
-                        }
-                    })
-                    
+                renameFiles(backupDir: backupRootDir, fileIDToName: fileIDToName, updateProgress: { progressValue in
                     DispatchQueue.main.async {
-                        resultMessage = "Processing completed successfully."
-                        isProcessing = false
+                        progress = Double(progressValue) / Double(totalFiles)  // Aktualizace progressu
                     }
-                } else {
+                })
+
+                organizeFiles(backupRootDir: backupRootDir, updateProgress: { progressValue in
                     DispatchQueue.main.async {
-                        resultMessage = "Failed to load Manifest.db."
-                        isProcessing = false
+                        progress = Double(progressValue) / Double(totalFiles)
                     }
+                })
+                
+                DispatchQueue.main.async {
+                    resultMessage = "Processing completed successfully."
+                    isProcessing = false
                 }
             } else {
                 DispatchQueue.main.async {
-                    resultMessage = "Manifest.db not found."
+                    resultMessage = "Failed to load Manifest.db."
                     isProcessing = false
                 }
             }
         }
     }
+
+    // Funkce pro zobrazení alertu
+    private func showAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Error"
+        alert.informativeText = "Probably the wrong folder. The file Manifest.db was not found in the selected folder."
+        alert.alertStyle = .critical
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
 }
 
 
