@@ -12,7 +12,10 @@ struct ContentView: View {
     @State private var backupRootDir: String = ""
     @State private var isProcessing = false
     @State private var resultMessage: String = ""
-    @State private var progress: Double = 0.0  // Nový stav pro sledování průběhu
+    @State private var progress: Double = 0.0  // Stav pro sledování průběhu
+    @State private var remainingTime: String = ""  // Nový stav pro zbývající čas
+    @State private var startTime: Date? = nil  // Uchová startovní čas
+    @State private var timer: Timer? = nil  // Časovač pro aktualizaci zbývajícího času
 
     var body: some View {
         VStack {
@@ -41,9 +44,13 @@ struct ContentView: View {
                 ProgressView(value: progress, total: 1.0)  // Progress bar
                     .padding()
                 
-                //zobrazení procent ještě
-                Text(String(format:"%.0f %%", progress*100))
+                Text(String(format:"%.0f %%", progress * 100))  // Zobrazení procent
                     .padding()
+                
+                if !remainingTime.isEmpty {
+                    Text("Estimated time remaining: \(remainingTime)")  // Zobrazení zbývajícího času
+                        .padding()
+                }
             }
 
             if !resultMessage.isEmpty {
@@ -51,7 +58,7 @@ struct ContentView: View {
                     .padding()
             }
         }
-        .frame(width: 500, height: 250)  // Upravená výška pro zahrnutí ProgressView
+        .frame(width: 500, height: 300)  // Upravená výška pro zahrnutí zbývajícího času
         .padding()
     }
 
@@ -80,6 +87,22 @@ struct ContentView: View {
         isProcessing = true
         resultMessage = "Processing..."
         progress = 0.0  // Resetuje progress
+        startTime = Date()  // Uloží startovní čas
+
+        // Spustíme časovač pro aktualizaci zbývajícího času jednou za 5 vteřin
+        timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+            if let startTime = startTime {
+                let elapsedTime = Date().timeIntervalSince(startTime)
+                let estimatedTotalTime = elapsedTime / progress * 1.0
+                let remainingTimeInterval = estimatedTotalTime - elapsedTime
+                
+                if remainingTimeInterval > 0 {
+                    remainingTime = formatTime(seconds: Int(remainingTimeInterval))
+                } else {
+                    remainingTime = "Less than a minute"
+                }
+            }
+        }
 
         DispatchQueue.global(qos: .background).async {
             if let fileIDToName = getFileIDToNameMapping(manifestDBPath: manifestDBPath) {
@@ -100,11 +123,13 @@ struct ContentView: View {
                 DispatchQueue.main.async {
                     resultMessage = "Processing completed successfully."
                     isProcessing = false
+                    timer?.invalidate()  // Zastav časovač po dokončení procesu
                 }
             } else {
                 DispatchQueue.main.async {
                     resultMessage = "Failed to load Manifest.db."
                     isProcessing = false
+                    timer?.invalidate()  // Zastav časovač při chybě
                 }
             }
         }
@@ -120,8 +145,16 @@ struct ContentView: View {
         alert.runModal()
     }
 
+    // Funkce pro formátování času
+    private func formatTime(seconds: Int) -> String {
+        let minutes = (seconds % 3600) / 60
+        if minutes > 0 {
+            return String(format: "%d minutes", minutes)
+        } else {
+            return "Less than a minute"
+        }
+    }
 }
-
 
 #Preview {
     ContentView()
