@@ -79,7 +79,7 @@ func renameFiles(backupDir: String, fileIDToName: [String: String], updateProgre
 
 
 func organizeFiles(backupRootDir: String, updateProgress: @escaping (Int) -> Void) {
-    let categories = ["Photos", "Videos", "Documents", "Others"]
+    let categories = ["Photos", "Videos", "Documents", "Others", "EmptyFiles"]
     let fileManager = FileManager.default
     let rootURL = URL(fileURLWithPath: backupRootDir)
     var processedFiles = 0  // Zde sledujeme počet zpracovaných souborů
@@ -96,28 +96,45 @@ func organizeFiles(backupRootDir: String, updateProgress: @escaping (Int) -> Voi
             ensureDirectoryExists(at: iphoneSubfolderURL.path)
         }
     }
-    
-    if let enumerator = fileManager.enumerator(at: rootURL, includingPropertiesForKeys: nil) {
+
+    // Enumerace souborů v root složce zálohy
+    if let enumerator = fileManager.enumerator(at: rootURL, includingPropertiesForKeys: [.fileSizeKey]) {
         for case let fileURL as URL in enumerator {
             if fileURL.hasDirectoryPath { continue }
-            let fileExtension = fileURL.pathExtension.lowercased()
-            let fileName = fileURL.lastPathComponent
-            
-            // Použijeme název souboru i příponu k určení cílové složky
-            let fileType = getFileType(for: fileName, fileExtension: fileExtension)
-            
-            print("Processing file: \(fileName) with extension: \(fileExtension), categorized as: \(fileType)")
-            
-            let categoryURL = rootURL.appendingPathComponent(fileType)
-            let destURL = categoryURL.appendingPathComponent(fileName)
-            
-            ensureDirectoryExists(at: categoryURL.path)
-            
-            do {
-                print("Moving \(fileURL.path) to \(destURL.path)")
-                try fileManager.moveItem(at: fileURL, to: destURL)
-            } catch {
-                print("Error moving file: \(error.localizedDescription)")
+
+            // Kontrola velikosti souboru
+            let fileAttributes = try? fileURL.resourceValues(forKeys: [.fileSizeKey])
+            if let fileSize = fileAttributes?.fileSize, fileSize == 0 {
+                // Pokud má soubor velikost 0, přesuneme ho do složky EmptyFiles
+                let emptyFilesURL = rootURL.appendingPathComponent("EmptyFiles").appendingPathComponent(fileURL.lastPathComponent)
+                
+                do {
+                    print("Moving empty file \(fileURL.path) to \(emptyFilesURL.path)")
+                    try fileManager.moveItem(at: fileURL, to: emptyFilesURL)
+                } catch {
+                    print("Error moving empty file: \(error.localizedDescription)")
+                }
+            } else {
+                // Zpracování neprázdných souborů
+                let fileExtension = fileURL.pathExtension.lowercased()
+                let fileName = fileURL.lastPathComponent
+                
+                // Použijeme název souboru i příponu k určení cílové složky
+                let fileType = getFileType(for: fileName, fileExtension: fileExtension)
+                
+                print("Processing file: \(fileName) with extension: \(fileExtension), categorized as: \(fileType)")
+                
+                let categoryURL = rootURL.appendingPathComponent(fileType)
+                let destURL = categoryURL.appendingPathComponent(fileName)
+                
+                ensureDirectoryExists(at: categoryURL.path)
+                
+                do {
+                    print("Moving \(fileURL.path) to \(destURL.path)")
+                    try fileManager.moveItem(at: fileURL, to: destURL)
+                } catch {
+                    print("Error moving file: \(error.localizedDescription)")
+                }
             }
 
             // Zvyšte počet zpracovaných souborů a aktualizujte průběh
@@ -126,6 +143,7 @@ func organizeFiles(backupRootDir: String, updateProgress: @escaping (Int) -> Voi
         }
     }
 }
+
 
 
 
